@@ -1,58 +1,61 @@
-# TODO: Convert addresses from tuples to binary
-"""
-def cidr_to_netmask(cidr):
-    t = sum(2**(8-1-i) for i in range(cidr%8))
-    mask = [255 if i < int(cidr/8) else t if i == int(cidr/8) else 0 for i in range(4)]
-    return tuple(mask)
-
-def f(cidr):
-    return bin(int('1'*cidr + '0'*(32-cidr),2))
-
+# Convert IP int to str
 def ip_to_str(ip):
-    ip = str(ip)[2:]
-    return '.'.join([int(ip[x:x+8],2) for x in range(0,32,8)])
-    
+    o1 = int(ip / 256**3) % 256
+    o2 = int(ip / 256**2) % 256
+    o3 = int(ip / 256) % 256
+    o4 = int(ip) % 256
+    return '{}.{}.{}.{}'.format(o1,o2,o3,o4)
+
+# Convert str to IP int
 def str_to_ip(st):
-    st = (st.replace(' ','')).split('.')
-    return bin(int(''.join(st),2))
-
-"""
-
-def print_a(t):
-    return '.'.join(map(str,t))
-
+    o = list(map(int, st.split('.')))
+    c = ''
+    if o[0] <= 127:
+        c = 'A'
+    elif o[0] <= 191:
+        c = 'B'
+    elif o[0] <= 223:
+        c = 'C'
+    else:
+        c = 'Unidentified'
+        
+    return (256**3 * o[0]) + (256**2 * o[1]) + (256 * o[2]) + o[3],t
+    
+# Convert CIDR notation to netmask
 def cidr_to_netmask(cidr):
-    t = sum(2**(8-1-i) for i in range(cidr%8))
-    mask = [255 if i < int(cidr/8) else t if i == int(cidr/8) else 0 for i in range(4)]
-    return tuple(mask)
-
-def str_to_ip(s):
-    s = s.replace(' ','')
-    ip = tuple(map(int,s.split('.')))
-    return ip
+    return int('1'*cidr + '0'*(32-cidr),2)
 
 # since using ~ will return a signed number (eg. ~255 = -256)
 # this method returns a number's unsigned binary complement 
 def unsigned_not(n):    
     mask = 0b11111111
     return int(~n&mask)
+
+if __name__ == '__main__':    
+    #s = input('Input IP address with netmask (eg. 202.10.133.19/20').split('/')
+    s = '202.10.133.19/20'.split('/')
+    ip,t   = str_to_ip(s[0])
+    cidr = int(s[1])
+    netmask     = cidr_to_netmask(cidr)
+    network_id  = ip & netmask
     
-#s = input('Input IP address with netmask').split('/')
-s = '202.10.133.11/24'.split('/')
-ip_input   = s[0]
-cidr_input = int(s[1])
+    # Calculate the wildcard of network (netmask compliment)
+    wildcard = unsigned_not(netmask)
+    # Bit-wise OR it with the IP address to obtain broadcast address
+    broadcast = wildcard | ip
 
-ip          = str_to_ip(ip_input)
-netmask     = cidr_to_netmask(cidr_input)
-network_id  = tuple(map(lambda x : x[0] & x[1],zip(ip,netmask)))
+    total_host = 2**(32-cidr)
+    usable_host = total_host - 2
+    ip_min = network_id - network_id % 256 + 1
+    ip_max = ip_min + usable_host - 1
+    
+    print(f'IP address: {ip_to_str(ip)}')
+    print(f'Netmask:    {ip_to_str(netmask)}')
+    print(f'Wildcard:   {ip_to_str(wildcard)} \n')
 
-# Take the complement of netmask
-bw_not_netmask = tuple(map(unsigned_not,netmask))
-# Bit-wise OR it with the IP address to obtain broadcast address
-broadcast = tuple(map(lambda x: x[0] | x[1], zip(bw_not_netmask, ip)))
-
-print('IP address: ', ip_input)
-print('Netmask:    ', print_a(netmask))
-print('Network ID: ', print_a(network_id))
-print('Broadcast:  ', print_a(broadcast))
-print('Total hosts:', 2**(32-cidr_input)-2)
+    print(f'Total hosts:       {total_host}')      # 1 address for broadcast, 1 for host address
+    print(f'Total usable host: {2**(32-cidr)-2}')    
+    print(f'Network ID: {ip_to_str(network_id)}/{cidr} (Class {t})')
+    print(f'IP min:     {ip_to_str(ip_min)}')
+    print(f'IP max:     {ip_to_str(ip_max)}')
+    print(f'Broadcast:  {ip_to_str(broadcast)}')
